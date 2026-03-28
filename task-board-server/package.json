@@ -17,7 +17,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "server": "docker build -t task-board-server . && docker run -d -p 3000:3000 --name task-board task-board-server"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
