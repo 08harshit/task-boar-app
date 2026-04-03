@@ -9,21 +9,7 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
-
-interface PresenceUser {
-    socketId: string;
-    id: string;
-    name: string;
-    color: string;
-    boardId: string;
-}
-
-interface TaskLock {
-    taskId: string;
-    userId: string;
-    userName: string;
-    timestamp: number;
-}
+import { CollaborationService } from './collaboration.service';
 
 @WebSocketGateway({
     cors: { origin: '*' },
@@ -34,27 +20,18 @@ export class BoardGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     private logger: Logger = new Logger('BoardGateway');
 
-    // State management (In-memory for now, scalable with Redis later)
-    private activeUsers = new Map<string, PresenceUser>(); // socketId -> User
-    private taskLocks = new Map<string, TaskLock>(); // taskId -> Lock
+    constructor(private readonly collaboration: CollaborationService) { }
 
     handleConnection(client: Socket) {
         this.logger.log(`Client connected: ${client.id}`);
     }
 
     handleDisconnect(client: Socket) {
-        const user = this.activeUsers.get(client.id);
-        if (user) {
-            this.logger.log(`User ${user.name} disconnected`);
-            this.activeUsers.delete(client.id);
-
-            // Cleanup any locks held by this user
-            this.releaseLocksForUser(user.id);
-
-            // Notify remaining people on the board
-            this.broadcastPresence(user.boardId);
-            this.broadcastLocks(user.boardId);
+        const boardId = this.collaboration.removeUser(client.id);
+        if (boardId) {
+            this.broadcastUpdates(boardId);
         }
+        this.logger.log(`Client disconnected: ${client.id}`);
     }
 
     @SubscribeMessage('joinBoard')
@@ -63,73 +40,36 @@ export class BoardGateway implements OnGatewayConnection, OnGatewayDisconnect {
         @MessageBody() payload: { boardId: string, user: { id: string, name: string, color: string } },
     ) {
         const { boardId, user } = payload;
-        this.logger.log(`User ${user.name} joined board: ${boardId}`);
-
         client.join(boardId);
-        this.activeUsers.set(client.id, { ...user, socketId: client.id, boardId });
-
-        // Notify room
-        this.broadcastPresence(boardId);
-        this.broadcastLocks(boardId);
+        this.collaboration.addUser(client.id, boardId, user);
+        this.broadcastUpdates(boardId);
     }
 
     @SubscribeMessage('lockTask')
     handleLockTask(
         @ConnectedSocket() client: Socket,
-        @MessageBody() payload: { taskId: string, boardId: string },
+        @MessageBody() payload: { taskId: string, boardId: string, userId: string, userName: string },
     ) {
-        const user = this.activeUsers.get(client.id);
-        if (!user) return;
-
-        // Check if already locked
-        const existingLock = this.taskLocks.get(payload.taskId);
-        if (existingLock && existingLock.userId !== user.id) {
-            client.emit('lockError', { message: 'Task is already being edited by another user' });
+        const success = this.collaboration.tryLockTask(payload.taskId, payload.userId, payload.userName);
+        if (!success) {
+            client.emit('lockError', { message: 'Task is already being edited' });
             return;
         }
-
-        // Set lock
-        this.taskLocks.set(payload.taskId, {
-            taskId: payload.taskId,
-            userId: user.id,
-            userName: user.name,
-            timestamp: Date.now()
-        });
-
-        this.broadcastLocks(payload.boardId);
+        this.broadcastUpdates(payload.boardId);
     }
 
     @SubscribeMessage('unlockTask')
-    handleUnlockTask(
-        @ConnectedSocket() client: Socket,
-        @MessageBody() payload: { taskId: string, boardId: string },
-    ) {
-        const lock = this.taskLocks.get(payload.taskId);
-        if (lock) {
-            this.taskLocks.delete(payload.taskId);
-            this.broadcastLocks(payload.boardId);
-        }
+    handleUnlockTask(@MessageBody() payload: { taskId: string, boardId: string }) {
+        this.collaboration.unlockTask(payload.taskId);
+        this.broadcastUpdates(payload.boardId);
     }
 
-    private broadcastPresence(boardId: string) {
-        const usersOnBoard = Array.from(this.activeUsers.values())
-            .filter(u => u.boardId === boardId);
-        this.server.to(boardId).emit('presenceUpdate', usersOnBoard);
+    private broadcastUpdates(boardId: string) {
+        this.server.to(boardId).emit('presenceUpdate', this.collaboration.getUsersOnBoard(boardId));
+        this.server.to(boardId).emit('locksUpdate', this.collaboration.getAllLocks());
     }
 
-    private broadcastLocks(boardId: string) {
-        const locks = Array.from(this.taskLocks.values());
-        this.server.to(boardId).emit('locksUpdate', locks);
-    }
-
-    private releaseLocksForUser(userId: string) {
-        for (const [taskId, lock] of this.taskLocks.entries()) {
-            if (lock.userId === userId) {
-                this.taskLocks.delete(taskId);
-            }
-        }
-    }
-
+    // Notifier for Boards/Tasks mutations
     notifyBoardUpdate(boardId: string, event: string, data: any) {
         this.server.to(boardId).emit(event, data);
     }

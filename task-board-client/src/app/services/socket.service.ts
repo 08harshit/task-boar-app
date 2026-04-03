@@ -53,8 +53,8 @@ export class SocketService {
         this.socket.emit('leaveBoard', boardId);
     }
 
-    lockTask(taskId: string, boardId: string) {
-        this.socket.emit('lockTask', { taskId, boardId });
+    lockTask(taskId: string, boardId: string, userId: string, userName: string) {
+        this.socket.emit('lockTask', { taskId, boardId, userId, userName });
     }
 
     unlockTask(taskId: string, boardId: string) {
