@@ -16,6 +16,12 @@ export class Task implements ITask {
     @Column({ type: 'text', nullable: true })
     details: string;
 
+    @Column({ type: 'enum', enum: ['low', 'medium', 'high'], default: 'medium' })
+    priority: 'low' | 'medium' | 'high';
+
+    @Column({ type: 'timestamp with time zone', nullable: true })
+    due_date: Date;
+
     @Column({ default: 0 })
     order: number;
 

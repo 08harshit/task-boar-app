@@ -35,7 +35,7 @@ export class BoardsService {
 
     async create(createBoardDto: CreateBoardDto): Promise<Board> {
         const board = this.boardRepository.create(createBoardDto);
-        return this.boardRepository.save(board);
+        return this.boardRepository.save(board) as Promise<Board>;
     }
 
     async remove(id: string): Promise<void> {
