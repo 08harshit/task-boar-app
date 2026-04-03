@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Task } from '../../entities/task.entity';
+import { BoardColumn } from '../../entities/column.entity';
 import { CreateTaskDto, UpdateTaskDto } from '@shared/index';
 import { BoardGateway } from '../boards/gateways/board.gateway';
-import { BoardColumn } from '../../entities/column.entity';
 
 @Injectable()
 export class TasksService {
@@ -14,6 +14,7 @@ export class TasksService {
         @InjectRepository(BoardColumn)
         private readonly columnRepository: Repository<BoardColumn>,
         private readonly boardGateway: BoardGateway,
+        private readonly dataSource: DataSource,
     ) { }
 
     async findByColumn(column_id: string): Promise<Task[]> {
@@ -35,35 +36,85 @@ export class TasksService {
     }
 
     async create(createTaskDto: CreateTaskDto): Promise<Task> {
-        const task = this.taskRepository.create(createTaskDto);
+        const { senderId, ...data } = createTaskDto;
+        const task = this.taskRepository.create(data);
         const saved = await (this.taskRepository.save(task) as Promise<Task>);
 
-        // Notify board
         const boardId = await this.getBoardIdByColumn(saved.column_id);
-        if (boardId) this.boardGateway.notifyBoardUpdate(boardId, 'board_updated', { type: 'task_added' });
-
+        if (boardId) {
+            this.boardGateway.notifyBoardUpdate(boardId, 'board_updated', { type: 'task_added', senderId });
+        }
         return saved;
     }
 
     async update(id: string, updateTaskDto: UpdateTaskDto): Promise<Task> {
-        const task = await this.findOne(id);
-        const oldColumnId = task.column_id;
+        const { senderId, order: newOrder, column_id: newColumnId, ...meta } = updateTaskDto;
 
-        this.taskRepository.merge(task, updateTaskDto);
-        const saved = await (this.taskRepository.save(task) as Promise<Task>);
+        return await this.dataSource.transaction(async manager => {
+            const task = await manager.findOne(Task, { where: { id } });
+            if (!task) throw new NotFoundException('Task not found');
 
-        // Notify board (on both old and new columns' board if changed, usually same board)
-        const boardId = await this.getBoardIdByColumn(saved.column_id);
-        if (boardId) this.boardGateway.notifyBoardUpdate(boardId, 'board_updated', { type: 'task_updated' });
+            const oldColumnId = task.column_id;
+            const oldOrder = task.order;
 
-        return saved;
+            // Apply metadata changes (title, priority, etc)
+            Object.assign(task, meta);
+
+            if (newColumnId !== undefined && (newColumnId !== oldColumnId || newOrder !== undefined)) {
+                // We are moving positions (same column or across columns)
+                const targetColumnId = newColumnId || oldColumnId;
+
+                // Fetch ALL tasks in both affected columns to re-index them flawlessly
+                const sourceTasks = await manager.find(Task, {
+                    where: { column_id: oldColumnId },
+                    order: { order: 'ASC' }
+                });
+
+                let targetTasks = (targetColumnId === oldColumnId)
+                    ? sourceTasks
+                    : await manager.find(Task, {
+                        where: { column_id: targetColumnId },
+                        order: { order: 'ASC' }
+                    });
+
+                // Remove task from source (in-memory)
+                const taskIdx = sourceTasks.findIndex(t => t.id === id);
+                if (taskIdx !== -1) sourceTasks.splice(taskIdx, 1);
+
+                // Add to target (in-memory)
+                const insertIdx = newOrder !== undefined ? newOrder : targetTasks.length;
+                task.column_id = targetColumnId;
+                targetTasks.splice(insertIdx, 0, task);
+
+                // Bulk update orders for BOTH columns
+                const allToUpdate = [...sourceTasks, ...targetTasks];
+
+                // Re-index Source
+                sourceTasks.forEach((t, i) => t.order = i);
+                // Re-index Target
+                targetTasks.forEach((t, i) => t.order = i);
+
+                // Persist all changes
+                await manager.save(Task, sourceTasks);
+                await manager.save(Task, targetTasks);
+            } else {
+                // Just metadata update
+                await manager.save(Task, task);
+            }
+
+            const boardId = await this.getBoardIdByColumn(task.column_id);
+            if (boardId) {
+                this.boardGateway.notifyBoardUpdate(boardId, 'board_updated', { type: 'task_updated', senderId });
+            }
+            return task;
+        });
     }
 
-    async remove(id: string): Promise<void> {
+    async remove(id: string, senderId?: string): Promise<void> {
         const task = await this.findOne(id);
         const boardId = await this.getBoardIdByColumn(task.column_id);
         await this.taskRepository.remove(task);
-        if (boardId) this.boardGateway.notifyBoardUpdate(boardId, 'board_updated', { type: 'task_deleted' });
+        if (boardId) this.boardGateway.notifyBoardUpdate(boardId, 'board_updated', { type: 'task_deleted', senderId });
     }
 
     private async getBoardIdByColumn(columnId: string): Promise<string | null> {

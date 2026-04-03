@@ -2,7 +2,7 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import { BoardService } from './board.service';
 import { SocketService, PresenceUser, TaskLock } from './socket.service';
 import { UserSessionService } from './user-session.service';
-import { IBoard, ITask } from '@shared/index';
+import { IBoard, ITask, CreateTaskDto, CreateColumnDto } from '@shared/index';
 import { firstValueFrom } from 'rxjs';
 
 @Injectable({
@@ -28,7 +28,14 @@ export class BoardStoreService {
         this.refreshBoard(id);
 
         // Initial setup for listeners
-        this.socketService.onBoardUpdate().subscribe(() => this.refreshBoard(id));
+        this.socketService.onBoardUpdate().subscribe((data: any) => {
+            // Filter out self-notifications (Echo Filtering)
+            if (data && data.senderId === this.session.user().id) {
+                return;
+            }
+            this.refreshBoard(id);
+        });
+
         this.socketService.onPresenceUpdate().subscribe(users => this._presence.set(users));
         this.socketService.onLocksUpdate().subscribe(locks => this._locks.set(locks));
     }
@@ -46,13 +53,35 @@ export class BoardStoreService {
         return computed(() => this._locks().find(l => l.taskId === taskId));
     }
 
-    // Mutations with automatic error/socket handling
-    async updateTask(id: string, taskId: string, data: any) {
-        await firstValueFrom(this.boardService.updateTask(taskId, data));
+    // Mutations
+    async createTask(data: Partial<CreateTaskDto>) {
+        const payload = { ...data, senderId: this.session.user().id } as CreateTaskDto;
+        await firstValueFrom(this.boardService.createTask(payload));
     }
 
-    async deleteTask(id: string, taskId: string) {
-        await firstValueFrom(this.boardService.deleteTask(taskId));
+    async updateTask(boardId: string, taskId: string, data: any) {
+        const payload = { ...data, senderId: this.session.user().id };
+        await firstValueFrom(this.boardService.updateTask(taskId, payload));
+    }
+
+    async deleteTask(boardId: string, taskId: string) {
+        const senderId = this.session.user().id;
+        await firstValueFrom(this.boardService.deleteTask(taskId, senderId));
+    }
+
+    async createColumn(data: Partial<CreateColumnDto>) {
+        const payload = { ...data, senderId: this.session.user().id } as CreateColumnDto;
+        await firstValueFrom(this.boardService.createColumn(payload));
+    }
+
+    async deleteColumn(boardId: string, columnId: string) {
+        const senderId = this.session.user().id;
+        await firstValueFrom(this.boardService.deleteColumn(columnId, senderId));
+    }
+
+    async updateColumnOrder(boardId: string, columnId: string, order: number) {
+        const senderId = this.session.user().id;
+        await firstValueFrom(this.boardService.updateColumnOrder(columnId, order, senderId));
     }
 
     lockTask(taskId: string, boardId: string) {

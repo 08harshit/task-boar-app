@@ -35,6 +35,14 @@ export class BoardService {
         return this.http.post<IColumn>(`${this.apiUrl}/columns`, dto);
     }
 
+    updateColumnOrder(id: string, order: number, senderId?: string): Observable<IColumn> {
+        return this.http.patch<IColumn>(`${this.apiUrl}/columns/${id}/order?senderId=${senderId}`, { order });
+    }
+
+    deleteColumn(id: string, senderId?: string): Observable<void> {
+        return this.http.delete<void>(`${this.apiUrl}/columns/${id}?senderId=${senderId}`);
+    }
+
     // Tasks
     createTask(dto: CreateTaskDto): Observable<ITask> {
         return this.http.post<ITask>(`${this.apiUrl}/tasks`, dto);
@@ -44,7 +52,7 @@ export class BoardService {
         return this.http.patch<ITask>(`${this.apiUrl}/tasks/${id}`, dto);
     }
 
-    deleteTask(id: string): Observable<void> {
-        return this.http.delete<void>(`${this.apiUrl}/tasks/${id}`);
+    deleteTask(id: string, senderId?: string): Observable<void> {
+        return this.http.delete<void>(`${this.apiUrl}/tasks/${id}?senderId=${senderId}`);
     }
 }

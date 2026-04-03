@@ -24,27 +24,30 @@ export class ColumnsService {
     }
 
     async create(createColumnDto: CreateColumnDto): Promise<BoardColumn> {
-        const column = this.columnRepository.create(createColumnDto);
+        const { senderId, ...data } = createColumnDto;
+        const column = this.columnRepository.create(data);
         const saved = await (this.columnRepository.save(column) as Promise<BoardColumn>);
-        this.boardGateway.notifyBoardUpdate(saved.board_id, 'board_updated', { type: 'column_added' });
+
+        this.boardGateway.notifyBoardUpdate(saved.board_id, 'board_updated', { type: 'column_added', senderId });
         return saved;
     }
 
-    async updateOrder(id: string, order: number): Promise<BoardColumn> {
+    async updateOrder(id: string, order: number, senderId?: string): Promise<BoardColumn> {
         const column = await this.columnRepository.findOne({ where: { id } });
         if (!column) throw new NotFoundException('Column not found');
         column.order = order;
         const saved = await (this.columnRepository.save(column) as Promise<BoardColumn>);
-        this.boardGateway.notifyBoardUpdate(saved.board_id, 'board_updated', { type: 'column_updated' });
+
+        this.boardGateway.notifyBoardUpdate(saved.board_id, 'board_updated', { type: 'column_updated', senderId });
         return saved;
     }
 
-    async remove(id: string): Promise<void> {
+    async remove(id: string, senderId?: string): Promise<void> {
         const column = await this.columnRepository.findOne({ where: { id } });
         if (column) {
             const boardId = column.board_id;
             await this.columnRepository.delete(id);
-            this.boardGateway.notifyBoardUpdate(boardId, 'board_updated', { type: 'column_deleted' });
+            this.boardGateway.notifyBoardUpdate(boardId, 'board_updated', { type: 'column_deleted', senderId });
         }
     }
 }

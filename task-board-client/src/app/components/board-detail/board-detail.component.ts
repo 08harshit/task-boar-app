@@ -135,22 +135,37 @@ export class BoardDetailComponent implements OnInit, OnDestroy {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
     } else {
       transferArrayItem(event.previousContainer.data, event.container.data, event.previousIndex, event.currentIndex);
-      this.store.updateTask(this.currentBoardId!, task.id, { column_id: targetColumnId, order: event.currentIndex });
     }
+
+    // Always notify store to persist the order (Store handles senderId filtering)
+    this.store.updateTask(this.currentBoardId!, task.id, { column_id: targetColumnId, order: event.currentIndex });
   }
 
   addColumn(): void {
     const name = prompt('New Column Name:');
-    // For brevity, using direct service for secondary operations or wrapping in store
-    if (name) {
-      // In production, move all mutations to Store
+    if (name && this.store.board()) {
+      this.store.createColumn({
+        board_id: this.store.board()!.id,
+        name,
+        order: this.store.board()!.columns?.length || 0
+      }).then(() => this.store.refreshBoard(this.currentBoardId!));
     }
   }
 
   addTask(columnId: string): void {
     const dialogRef = this.dialog.open(TaskDialogComponent, { width: '500px', data: {} });
     dialogRef.afterClosed().subscribe(result => {
-      // Handle task creation via store
+      if (result) {
+        const order = this.store.board()?.columns?.find(c => c.id === columnId)?.tasks?.length || 0;
+        this.store.createTask({
+          column_id: columnId,
+          title: result.title,
+          details: result.details,
+          priority: result.priority,
+          due_date: result.due_date,
+          order
+        }).then(() => this.store.refreshBoard(this.currentBoardId!));
+      }
     });
   }
 

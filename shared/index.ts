@@ -29,17 +29,21 @@ export interface ITask {
 }
 
 // DTOs for mutations (Classes for reflection support)
-export class CreateBoardDto {
+export class BaseDto {
+    senderId?: string;
+}
+
+export class CreateBoardDto extends BaseDto {
     name!: string;
 }
 
-export class CreateColumnDto {
+export class CreateColumnDto extends BaseDto {
     board_id!: string;
     name!: string;
     order!: number;
 }
 
-export class CreateTaskDto {
+export class CreateTaskDto extends BaseDto {
     column_id!: string;
     title!: string;
     details?: string;
@@ -48,7 +52,7 @@ export class CreateTaskDto {
     order!: number;
 }
 
-export class UpdateTaskDto {
+export class UpdateTaskDto extends BaseDto {
     title?: string;
     details?: string;
     column_id?: string;

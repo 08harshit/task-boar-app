@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Body, Param, Query, Patch, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { ColumnsService } from './columns.service';
-import { CreateColumnDto } from '@shared/index';
 import { BoardColumn } from '../../entities/column.entity';
+import { CreateColumnDto } from '@shared/index';
 
 @Controller('columns')
 export class ColumnsController {
@@ -18,12 +18,16 @@ export class ColumnsController {
     }
 
     @Patch(':id/order')
-    updateOrder(@Param('id') id: string, @Body('order') order: number): Promise<BoardColumn> {
-        return this.columnsService.updateOrder(id, order);
+    updateOrder(
+        @Param('id') id: string,
+        @Body('order') order: number,
+        @Query('senderId') senderId?: string
+    ): Promise<BoardColumn> {
+        return this.columnsService.updateOrder(id, order, senderId);
     }
 
     @Delete(':id')
-    remove(@Param('id') id: string): Promise<void> {
-        return this.columnsService.remove(id);
+    remove(@Param('id') id: string, @Query('senderId') senderId?: string): Promise<void> {
+        return this.columnsService.remove(id, senderId);
     }
 }
