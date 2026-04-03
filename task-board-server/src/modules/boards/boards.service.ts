@@ -11,13 +11,14 @@ export class BoardsService {
         private readonly boardRepository: Repository<Board>,
     ) { }
 
-    async findAll(): Promise<Board[]> {
-        return this.boardRepository.find({
-            relations: ['columns', 'columns.tasks'],
-            order: {
-                created_at: 'DESC',
-            },
-        });
+    async findAll(projectId?: string): Promise<Board[]> {
+        if (projectId) {
+            return this.boardRepository.find({
+                where: { project_id: projectId },
+                relations: ['columns', 'columns.tasks']
+            });
+        }
+        return this.boardRepository.find({ relations: ['columns', 'columns.tasks'] });
     }
 
     async findOne(id: string): Promise<Board> {
@@ -34,8 +35,11 @@ export class BoardsService {
     }
 
     async create(createBoardDto: CreateBoardDto): Promise<Board> {
-        const board = this.boardRepository.create(createBoardDto);
-        return this.boardRepository.save(board) as Promise<Board>;
+        const board = this.boardRepository.create({
+            name: createBoardDto.name,
+            project_id: createBoardDto.project_id
+        });
+        return this.boardRepository.save(board);
     }
 
     async remove(id: string): Promise<void> {

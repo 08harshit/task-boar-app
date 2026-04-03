@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto, UpdateTaskDto } from '@shared/index';
 import { Task } from '../../entities/task.entity';
+import { SupabaseAuthGuard } from '../auth/auth.guard';
 
 @Controller('tasks')
+@UseGuards(SupabaseAuthGuard)
 export class TasksController {
     constructor(private readonly tasksService: TasksService) { }
 

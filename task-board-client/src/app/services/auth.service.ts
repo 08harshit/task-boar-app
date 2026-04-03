@@ -1,7 +1,6 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 import { environment } from '../../environments/environment';
-import { BehaviorSubject, from, Observable } from 'rxjs';
 import { Router } from '@angular/router';
 
 @Injectable({
@@ -9,23 +8,27 @@ import { Router } from '@angular/router';
 })
 export class AuthService {
     private supabase: SupabaseClient;
-    private _currentUser = new BehaviorSubject<User | null>(null);
-
-    public user$ = this._currentUser.asObservable();
     private router = inject(Router);
+
+    // Core Auth State Signal
+    private _currentUser = signal<User | null>(null);
+
+    // Publicly exposed readonly signals
+    public user = computed(() => this._currentUser());
+    public isAuthenticated = computed(() => !!this._currentUser());
 
     constructor() {
         this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey);
 
-        // Initial session check
+        // Initial check
         this.supabase.auth.getSession().then(({ data }) => {
-            this._currentUser.next(data.session?.user ?? null);
+            this._currentUser.set(data.session?.user ?? null);
         });
 
-        // Listen for auth changes
+        // Subscriptions
         this.supabase.auth.onAuthStateChange((event, session) => {
-            console.log('Auth Event:', event);
-            this._currentUser.next(session?.user ?? null);
+            console.log('Auth Signal Change:', event);
+            this._currentUser.set(session?.user ?? null);
             if (event === 'SIGNED_OUT') {
                 this.router.navigate(['/login']);
             }
@@ -33,16 +36,14 @@ export class AuthService {
     }
 
     get currentUser() {
-        return this._currentUser.value;
+        return this._currentUser();
     }
 
     async signUp(email: string, password: string, name: string) {
         const { data, error } = await this.supabase.auth.signUp({
             email,
             password,
-            options: {
-                data: { full_name: name }
-            }
+            options: { data: { full_name: name } }
         });
         if (error) throw error;
         return data;

@@ -1,58 +1,31 @@
-import { Injectable, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Injectable, inject } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { IBoard, CreateBoardDto } from '@shared/index';
 import { environment } from '../../environments/environment';
-import { IBoard, IColumn, ITask, CreateBoardDto, CreateColumnDto, CreateTaskDto, UpdateTaskDto } from '@shared/index';
 
 @Injectable({
     providedIn: 'root'
 })
 export class BoardService {
-    private apiUrl = environment.apiUrl;
+    private http = inject(HttpClient);
+    private apiUrl = `${environment.apiUrl}/boards`;
 
-    // Use a signal for reactive board state (Modern Angular)
-    activeBoard = signal<IBoard | null>(null);
-
-    constructor(private http: HttpClient) { }
-
-    // Boards
-    getBoards(): Observable<IBoard[]> {
-        return this.http.get<IBoard[]>(`${this.apiUrl}/boards`);
+    getBoards(projectId?: string): Observable<IBoard[]> {
+        let params = new HttpParams();
+        if (projectId) params = params.set('projectId', projectId);
+        return this.http.get<IBoard[]>(this.apiUrl, { params });
     }
 
     getBoard(id: string): Observable<IBoard> {
-        return this.http.get<IBoard>(`${this.apiUrl}/boards/${id}`).pipe(
-            tap(board => this.activeBoard.set(board))
-        );
+        return this.http.get<IBoard>(`${this.apiUrl}/${id}`);
     }
 
     createBoard(dto: CreateBoardDto): Observable<IBoard> {
-        return this.http.post<IBoard>(`${this.apiUrl}/boards`, dto);
+        return this.http.post<IBoard>(this.apiUrl, dto);
     }
 
-    // Columns 
-    createColumn(dto: CreateColumnDto): Observable<IColumn> {
-        return this.http.post<IColumn>(`${this.apiUrl}/columns`, dto);
-    }
-
-    updateColumnOrder(id: string, order: number, senderId?: string): Observable<IColumn> {
-        return this.http.patch<IColumn>(`${this.apiUrl}/columns/${id}/order?senderId=${senderId}`, { order });
-    }
-
-    deleteColumn(id: string, senderId?: string): Observable<void> {
-        return this.http.delete<void>(`${this.apiUrl}/columns/${id}?senderId=${senderId}`);
-    }
-
-    // Tasks
-    createTask(dto: CreateTaskDto): Observable<ITask> {
-        return this.http.post<ITask>(`${this.apiUrl}/tasks`, dto);
-    }
-
-    updateTask(id: string, dto: UpdateTaskDto): Observable<ITask> {
-        return this.http.patch<ITask>(`${this.apiUrl}/tasks/${id}`, dto);
-    }
-
-    deleteTask(id: string, senderId?: string): Observable<void> {
-        return this.http.delete<void>(`${this.apiUrl}/tasks/${id}?senderId=${senderId}`);
+    deleteBoard(id: string): Observable<void> {
+        return this.http.delete<void>(`${this.apiUrl}/${id}`);
     }
 }

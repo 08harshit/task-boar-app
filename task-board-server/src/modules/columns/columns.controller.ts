@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
 import { ColumnsService } from './columns.service';
 import { BoardColumn } from '../../entities/column.entity';
 import { CreateColumnDto } from '@shared/index';
+import { SupabaseAuthGuard } from '../auth/auth.guard';
 
 @Controller('columns')
+@UseGuards(SupabaseAuthGuard)
 export class ColumnsController {
     constructor(private readonly columnsService: ColumnsService) { }
 

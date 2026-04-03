@@ -1,6 +1,17 @@
+export interface IProject {
+    id: string;
+    name: string;
+    description?: string;
+    owner_id: string;
+    boards?: IBoard[];
+    created_at: Date;
+    updated_at: Date;
+}
+
 export interface IBoard {
     id: string;
     name: string;
+    project_id?: string;
     columns?: IColumn[];
     created_at: Date;
     updated_at: Date;
@@ -33,8 +44,14 @@ export class BaseDto {
     senderId?: string;
 }
 
+export class CreateProjectDto extends BaseDto {
+    name!: string;
+    description?: string;
+}
+
 export class CreateBoardDto extends BaseDto {
     name!: string;
+    project_id!: string;
 }
 
 export class CreateColumnDto extends BaseDto {
