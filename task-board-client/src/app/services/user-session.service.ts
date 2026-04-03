@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
+import { AuthService } from './auth.service';
 
 export interface UserSession {
     id: string;
@@ -10,38 +11,27 @@ export interface UserSession {
     providedIn: 'root'
 })
 export class UserSessionService {
-    private readonly SESSION_KEY = 'task_board_user_session';
+    private auth = inject(AuthService);
 
-    user = signal<UserSession>({ id: '', name: '', color: '' });
+    // Colors for presence avatars
+    private colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
-    constructor() {
-        this.restoreOrInitSession();
-    }
+    // Signal for the current session user (reactive)
+    private _user = signal<UserSession | null>(null);
 
-    private restoreOrInitSession() {
-        const stored = localStorage.getItem(this.SESSION_KEY);
-        if (stored) {
-            this.user.set(JSON.parse(stored));
-        } else {
-            const newUser = {
-                id: crypto.randomUUID(),
-                name: `User_${Math.floor(Math.random() * 1000)}`,
-                color: this.getRandomColor()
-            };
-            localStorage.setItem(this.SESSION_KEY, JSON.stringify(newUser));
-            this.user.set(newUser);
-        }
-    }
+    user = computed(() => {
+        const supabaseUser = this.auth.currentUser;
+        if (!supabaseUser) return { id: 'guest', name: 'Guest', color: '#94a3b8' };
 
-    private getRandomColor(): string {
-        const colors = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-        return colors[Math.floor(Math.random() * colors.length)];
-    }
+        return {
+            id: supabaseUser.id,
+            name: supabaseUser.user_metadata?.['full_name'] || supabaseUser.email || 'Anonymous',
+            color: this.getUserColor(supabaseUser.id)
+        };
+    });
 
-    updateProfile(name: string) {
-        const current = this.user();
-        const updated = { ...current, name };
-        localStorage.setItem(this.SESSION_KEY, JSON.stringify(updated));
-        this.user.set(updated);
+    private getUserColor(id: string): string {
+        const index = id.charCodeAt(0) % this.colors.length;
+        return this.colors[index];
     }
 }
