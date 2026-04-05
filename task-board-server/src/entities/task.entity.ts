@@ -22,6 +22,9 @@ export class Task implements ITask {
     @Column({ type: 'timestamp with time zone', nullable: true })
     due_date: Date;
 
+    @Column({ type: 'simple-array', nullable: true })
+    labels: string[];
+
     @Column({ default: 0 })
     order: number;
 

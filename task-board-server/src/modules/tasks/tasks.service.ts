@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In } from 'typeorm';
+import { Repository, DataSource, In, ILike } from 'typeorm';
 import { Task } from '../../entities/task.entity';
 import { BoardColumn } from '../../entities/column.entity';
 import { CreateTaskDto, UpdateTaskDto } from '@shared/index';
@@ -16,6 +16,18 @@ export class TasksService {
         private readonly boardGateway: BoardGateway,
         private readonly dataSource: DataSource,
     ) { }
+
+    async search(query: string, boardId?: string): Promise<Task[]> {
+        const baseQuery = this.taskRepository.createQueryBuilder('task')
+            .leftJoinAndSelect('task.column', 'column')
+            .where('(task.title ILike :query OR task.details ILike :query)', { query: `%${query}%` });
+
+        if (boardId) {
+            baseQuery.andWhere('column.board_id = :boardId', { boardId });
+        }
+
+        return baseQuery.getMany();
+    }
 
     async findByColumn(column_id: string): Promise<Task[]> {
         return this.taskRepository.find({
@@ -90,8 +102,9 @@ export class TasksService {
                 const allToUpdate = [...sourceTasks, ...targetTasks];
 
                 // Re-index Source
+                allToUpdate.forEach((t, i) => { if (t.column_id === oldColumnId) { /* handled separately below */ } });
+
                 sourceTasks.forEach((t, i) => t.order = i);
-                // Re-index Target
                 targetTasks.forEach((t, i) => t.order = i);
 
                 // Persist all changes

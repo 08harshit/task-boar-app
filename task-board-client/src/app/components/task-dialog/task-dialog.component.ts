@@ -11,20 +11,20 @@ import { MatNativeDateModule } from '@angular/material/core';
 import { ITask } from '@shared/index';
 
 @Component({
-    selector: 'app-task-dialog',
-    standalone: true,
-    imports: [
-        CommonModule,
-        ReactiveFormsModule,
-        MatDialogModule,
-        MatFormFieldModule,
-        MatInputModule,
-        MatSelectModule,
-        MatButtonModule,
-        MatDatepickerModule,
-        MatNativeDateModule
-    ],
-    template: `
+  selector: 'app-task-dialog',
+  standalone: true,
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatSelectModule,
+    MatButtonModule,
+    MatDatepickerModule,
+    MatNativeDateModule
+  ],
+  template: `
     <h2 mat-dialog-title>{{ data.task ? 'Edit Task' : 'New Task' }}</h2>
     <mat-dialog-content>
       <form [formGroup]="taskForm" class="task-form">
@@ -37,6 +37,11 @@ import { ITask } from '@shared/index';
         <mat-form-field appearance="outline">
           <mat-label>Details</mat-label>
           <textarea matInput formControlName="details" rows="3" placeholder="Add more context..."></textarea>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Labels (Comma separated)</mat-label>
+          <input matInput formControlName="labelsInput" placeholder="Design, Frontend, API">
         </mat-form-field>
 
         <div class="row">
@@ -59,37 +64,53 @@ import { ITask } from '@shared/index';
       </form>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close>Cancel</button>
+      <button mat-button (click)="cancel()">Cancel</button>
       <button mat-flat-button color="primary" [disabled]="taskForm.invalid" (click)="save()">
         {{ data.task ? 'Save Changes' : 'Create Task' }}
       </button>
     </mat-dialog-actions>
   `,
-    styles: [`
-    .task-form { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; min-width: 400px; }
+  styles: [`
+    .task-form { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; min-width: 450px; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     mat-form-field { width: 100%; }
+    ::ng-deep .mat-mdc-dialog-container .mat-mdc-dialog-surface { border-radius: 16px !important; }
   `]
 })
 export class TaskDialogComponent {
-    taskForm: FormGroup;
+  taskForm: FormGroup;
 
-    constructor(
-        private fb: FormBuilder,
-        private dialogRef: MatDialogRef<TaskDialogComponent>,
-        @Inject(MAT_DIALOG_DATA) public data: { task?: ITask }
-    ) {
-        this.taskForm = this.fb.group({
-            title: [data.task?.title || '', Validators.required],
-            details: [data.task?.details || ''],
-            priority: [data.task?.priority || 'medium'],
-            due_date: [data.task?.due_date ? new Date(data.task.due_date) : null]
-        });
-    }
+  constructor(
+    private fb: FormBuilder,
+    private dialogRef: MatDialogRef<TaskDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: { task?: ITask }
+  ) {
+    const labels = data.task?.labels?.join(', ') || '';
+    this.taskForm = this.fb.group({
+      title: [data.task?.title || '', Validators.required],
+      details: [data.task?.details || ''],
+      labelsInput: [labels],
+      priority: [data.task?.priority || 'medium'],
+      due_date: [data.task?.due_date ? new Date(data.task.due_date) : null]
+    });
+  }
 
-    save() {
-        if (this.taskForm.valid) {
-            this.dialogRef.close(this.taskForm.value);
-        }
+  cancel() {
+    this.dialogRef.close();
+  }
+
+  save() {
+    if (this.taskForm.valid) {
+      const val = this.taskForm.value;
+      const labels = val.labelsInput ? val.labelsInput.split(',').map((l: string) => l.trim()).filter((l: string) => l !== '') : [];
+      const result = {
+        title: val.title,
+        details: val.details,
+        priority: val.priority,
+        due_date: val.due_date,
+        labels
+      };
+      this.dialogRef.close(result);
     }
+  }
 }

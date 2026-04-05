@@ -3,13 +3,12 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { ProjectService } from '../../services/project.service';
 import { IProject } from '@shared/index';
-import { TaskBoardLayoutComponent } from '../../layouts/task-board-layout/task-board-layout.component';
 
 @Component({
-    selector: 'app-project-list',
-    standalone: true,
-    imports: [CommonModule, RouterModule],
-    template: `
+  selector: 'app-project-list',
+  standalone: true,
+  imports: [CommonModule, RouterModule],
+  template: `
     <div class="project-view">
       <header>
         <div class="title-group">
@@ -23,7 +22,7 @@ import { TaskBoardLayoutComponent } from '../../layouts/task-board-layout/task-b
         @for (project of projects(); track project.id) {
           <div class="project-card" [routerLink]="['/projects', project.id]">
             <div class="card-header">
-              <div class="project-icon">{{ project.name[0].toUpperCase() }}</div>
+              <div class="project-icon">{{ (project.name[0] || 'P').toUpperCase() }}</div>
             </div>
             <div class="card-body">
               <h3>{{ project.name }}</h3>
@@ -45,7 +44,7 @@ import { TaskBoardLayoutComponent } from '../../layouts/task-board-layout/task-b
       </div>
     </div>
   `,
-    styles: [`
+  styles: [`
     .project-view { padding: 40px; max-width: 1200px; margin: 0 auto; min-height: 100vh; }
     header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px; }
     h1 { font-size: 2.25rem; font-weight: 800; color: #1e293b; margin: 0; }
@@ -68,33 +67,33 @@ import { TaskBoardLayoutComponent } from '../../layouts/task-board-layout/task-b
   `]
 })
 export class ProjectListComponent implements OnInit {
-    private projectService = inject(ProjectService);
-    private router = inject(Router);
-    projects = signal<IProject[]>([]);
+  private projectService = inject(ProjectService);
+  private router = inject(Router);
+  projects = signal<IProject[]>([]);
 
-    async ngOnInit() {
+  async ngOnInit() {
+    await this.loadProjects();
+  }
+
+  async loadProjects() {
+    try {
+      const data = await this.projectService.getProjects();
+      this.projects.set(data || []);
+    } catch (err) {
+      console.error('Failed to load projects', err);
+    }
+  }
+
+  async createProject() {
+    const name = prompt('Project Name:');
+    if (name) {
+      const description = prompt('Project Description (optional):') || '';
+      try {
+        await this.projectService.createProject({ name, description });
         await this.loadProjects();
+      } catch (err) {
+        alert('Failed to create project. Please try again.');
+      }
     }
-
-    async loadProjects() {
-        try {
-            const data = await this.projectService.getProjects();
-            this.projects.set(data);
-        } catch (err) {
-            console.error('Failed to load projects', err);
-        }
-    }
-
-    async createProject() {
-        const name = prompt('Project Name:');
-        if (name) {
-            const description = prompt('Project Description (optional):') || '';
-            try {
-                await this.projectService.createProject({ name, description });
-                await this.loadProjects();
-            } catch (err) {
-                alert('Failed to create project. Please try again.');
-            }
-        }
-    }
+  }
 }

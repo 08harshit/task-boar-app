@@ -18,21 +18,51 @@ export class BoardStoreService {
     private _presence = signal<PresenceUser[]>([]);
     private _locks = signal<TaskLock[]>([]);
 
+    // Filtering State
+    private _filterQuery = signal<string>('');
+    private _filterPriority = signal<string | null>(null);
+
     // Computed state
     board = computed(() => this._board());
     activeUsers = computed(() => this._presence());
     taskLocks = computed(() => this._locks());
 
+    // Filtered Board View
+    filteredBoard = computed(() => {
+        const currentBoard = this._board();
+        if (!currentBoard) return null;
+
+        const query = this._filterQuery().toLowerCase();
+        const priority = this._filterPriority();
+
+        if (!query && !priority) return currentBoard;
+
+        return {
+            ...currentBoard,
+            columns: currentBoard.columns?.map(col => ({
+                ...col,
+                tasks: col.tasks?.filter(task => {
+                    const matchesQuery = !query ||
+                        task.title.toLowerCase().includes(query) ||
+                        (task.details?.toLowerCase().includes(query));
+                    const matchesPriority = !priority || task.priority === priority;
+                    return matchesQuery && matchesPriority;
+                }) || []
+            })) || []
+        };
+    });
+
+    setFilterQuery(q: string) { this._filterQuery.set(q); }
+    setFilterPriority(p: string | null) { this._filterPriority.set(p); }
+    get filterQuery() { return this._filterQuery(); }
+    get filterPriority() { return this._filterPriority(); }
+
     async loadBoard(id: string) {
         this.socketService.joinBoard(id, this.session.user());
         this.refreshBoard(id);
 
-        // Initial setup for listeners
         this.socketService.onBoardUpdate().subscribe((data: any) => {
-            // Filter out self-notifications (Echo Filtering)
-            if (data && data.senderId === this.session.user().id) {
-                return;
-            }
+            if (data && data.senderId === this.session.user().id) return;
             this.refreshBoard(id);
         });
 
@@ -43,6 +73,8 @@ export class BoardStoreService {
     leaveBoard(id: string) {
         this.socketService.leaveBoard(id);
         this._board.set(null);
+        this._filterQuery.set('');
+        this._filterPriority.set(null);
     }
 
     refreshBoard(id: string) {

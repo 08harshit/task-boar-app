@@ -9,10 +9,9 @@ export class SupabaseService implements OnModuleInit {
     constructor(private config: ConfigService) { }
 
     onModuleInit() {
-        this.client = createClient(
-            this.config.get('SUPABASE_URL'),
-            this.config.get('SUPABASE_ANON_KEY'),
-        );
+        const url = this.config.get<string>('SUPABASE_URL')!;
+        const key = this.config.get<string>('SUPABASE_ANON_KEY')!;
+        this.client = createClient(url, key);
     }
 
     async verifyToken(token: string) {

@@ -9,6 +9,14 @@ import { SupabaseAuthGuard } from '../auth/auth.guard';
 export class TasksController {
     constructor(private readonly tasksService: TasksService) { }
 
+    @Get('search')
+    search(
+        @Query('query') query: string,
+        @Query('boardId') boardId?: string
+    ): Promise<Task[]> {
+        return this.tasksService.search(query, boardId);
+    }
+
     @Get()
     findByColumn(@Query('columnId') columnId: string): Promise<Task[]> {
         return this.tasksService.findByColumn(columnId);

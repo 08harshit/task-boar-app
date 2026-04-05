@@ -34,6 +34,7 @@ export interface ITask {
     details: string;
     priority?: 'low' | 'medium' | 'high';
     due_date?: Date;
+    labels?: string[];
     order: number;
     created_at: Date;
     updated_at: Date;
@@ -66,6 +67,7 @@ export class CreateTaskDto extends BaseDto {
     details?: string;
     priority?: 'low' | 'medium' | 'high';
     due_date?: Date;
+    labels?: string[];
     order!: number;
 }
 
@@ -75,5 +77,6 @@ export class UpdateTaskDto extends BaseDto {
     column_id?: string;
     priority?: 'low' | 'medium' | 'high';
     due_date?: Date;
+    labels?: string[];
     order?: number;
 }

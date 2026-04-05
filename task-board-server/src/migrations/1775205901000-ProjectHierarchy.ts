@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class ProjectHierarchy1775205901 implements MigrationInterface {
-    name = 'ProjectHierarchy1775205901'
+export class ProjectHierarchy1775205901000 implements MigrationInterface {
+    name = 'ProjectHierarchy1775205901000'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         // Create projects table

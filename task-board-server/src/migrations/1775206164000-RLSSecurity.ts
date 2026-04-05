@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class RLSSecurity1775206164 implements MigrationInterface {
-    name = 'RLSSecurity1775206164'
+export class RLSSecurity1775206164000 implements MigrationInterface {
+    name = 'RLSSecurity1775206164000'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         // 1. Enable RLS on all tables
