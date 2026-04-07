@@ -1,6 +1,10 @@
+import { setDefaultResultOrder } from 'node:dns';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger } from '@nestjs/common';
+
+/** Prefer A over AAAA ordering so pg/ioredis pick IPv4 first when both exist (helps flaky IPv6 in Docker/VPN). */
+setDefaultResultOrder('ipv4first');
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');

@@ -8,10 +8,12 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { RedisModule } from './modules/redis/redis.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    RedisModule,
     DatabaseModule,
     AuthModule,
     ProjectsModule,

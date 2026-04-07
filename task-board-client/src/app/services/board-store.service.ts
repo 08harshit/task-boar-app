@@ -71,7 +71,7 @@ export class BoardStoreService {
     }
 
     leaveBoard(id: string) {
-        this.socketService.leaveBoard(id);
+        this.socketService.leaveBoard(id, this.session.user().id);
         this._board.set(null);
         this._filterQuery.set('');
         this._filterPriority.set(null);
@@ -122,6 +122,11 @@ export class BoardStoreService {
     }
 
     unlockTask(taskId: string, boardId: string) {
-        this.socketService.unlockTask(taskId, boardId);
+        this.socketService.unlockTask(taskId, boardId, this.session.user().id);
+    }
+
+    startLockRenewal(taskId: string, boardId: string) {
+        const u = this.session.user();
+        return this.socketService.startLockRenewal(taskId, boardId, u.id);
     }
 }

@@ -1,0 +1,41 @@
+# Default project network so service DNS names (e.g. `redis`) resolve consistently.
+networks:
+  default:
+    name: task-board-app-net
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    command: redis-server --appendonly yes
+    volumes:
+      - task-board-redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  # Nest API — REDIS_URL uses the compose service name `redis` (not localhost).
+  # dns_search: [] avoids host search domains breaking short names (e.g. redis).
+  # External hosts (Supabase) still need working DNS; if you see EAI_AGAIN on pooler.*.supabase.com,
+  # try a direct DB URL, fix Docker/VPN DNS, or see task-board-server/.env.example.
+  api:
+    build:
+      context: .
+      dockerfile: task-board-server/Dockerfile
+    # Host port: set API_HOST_PORT if 3000 is already in use (e.g. API_HOST_PORT=3001 docker compose up api)
+    ports:
+      - '${API_HOST_PORT:-3000}:3000'
+    env_file:
+      - task-board-server/.env
+    dns_search: []
+    environment:
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  task-board-redis-data:

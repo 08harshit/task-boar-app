@@ -49,16 +49,30 @@ export class SocketService {
         this.socket.emit('joinBoard', { boardId, user });
     }
 
-    leaveBoard(boardId: string) {
-        this.socket.emit('leaveBoard', boardId);
+    leaveBoard(boardId: string, userId: string) {
+        this.socket.emit('leaveBoard', { boardId, userId });
     }
 
     lockTask(taskId: string, boardId: string, userId: string, userName: string) {
         this.socket.emit('lockTask', { taskId, boardId, userId, userName });
     }
 
-    unlockTask(taskId: string, boardId: string) {
-        this.socket.emit('unlockTask', { taskId, boardId });
+    unlockTask(taskId: string, boardId: string, userId: string) {
+        this.socket.emit('unlockTask', { taskId, boardId, userId });
+    }
+
+    renewTaskLock(taskId: string, boardId: string, userId: string) {
+        this.socket.emit('renewTaskLock', { taskId, boardId, userId });
+    }
+
+    /**
+     * Keeps Redis TTL fresh while the edit dialog is open. Call stop() in afterClosed.
+     */
+    startLockRenewal(taskId: string, boardId: string, userId: string, intervalMs = 15_000): () => void {
+        const id = window.setInterval(() => {
+            this.renewTaskLock(taskId, boardId, userId);
+        }, intervalMs);
+        return () => window.clearInterval(id);
     }
 
     onBoardUpdate(): Observable<any> {

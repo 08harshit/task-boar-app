@@ -219,8 +219,11 @@ export class BoardDetailComponent implements OnInit, OnDestroy {
     const boardId = this.currentBoardId!;
     this.store.lockTask(task.id, boardId);
 
+    const stopRenew = this.store.startLockRenewal(task.id, boardId);
+
     const dialogRef = this.dialog.open(TaskDialogComponent, { width: '500px', data: { task } });
     dialogRef.afterClosed().subscribe(result => {
+      stopRenew();
       this.store.unlockTask(task.id, boardId);
       if (result) {
         this.store.updateTask(boardId, task.id, result);

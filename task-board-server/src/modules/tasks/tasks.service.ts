@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In, ILike } from 'typeorm';
+import { Repository, DataSource, ILike } from 'typeorm';
 import { Task } from '../../entities/task.entity';
 import { BoardColumn } from '../../entities/column.entity';
 import { CreateTaskDto, UpdateTaskDto } from '@shared/index';
 import { BoardGateway } from '../boards/gateways/board.gateway';
+import { TaskLockService } from '../redis/task-lock.service';
 
 @Injectable()
 export class TasksService {
@@ -15,7 +16,39 @@ export class TasksService {
         private readonly columnRepository: Repository<BoardColumn>,
         private readonly boardGateway: BoardGateway,
         private readonly dataSource: DataSource,
+        private readonly taskLocks: TaskLockService,
     ) { }
+
+    private touchesContentFields(dto: UpdateTaskDto): boolean {
+        return (
+            dto.title !== undefined ||
+            dto.details !== undefined ||
+            dto.priority !== undefined ||
+            dto.due_date !== undefined ||
+            dto.labels !== undefined
+        );
+    }
+
+    private async assertContentEditLock(taskId: string, senderId: string): Promise<void> {
+        const holder = await this.taskLocks.getHolder(taskId);
+        if (!holder) {
+            throw new HttpException(
+                'Acquire an edit lock before saving (open the task editor, or lock expired)',
+                HttpStatus.LOCKED,
+            );
+        }
+        if (holder !== senderId) {
+            throw new HttpException('Task is locked by another user', HttpStatus.LOCKED);
+        }
+    }
+
+    private async assertDeleteAllowed(taskId: string, senderId: string | undefined): Promise<void> {
+        const holder = await this.taskLocks.getHolder(taskId);
+        if (!holder) return;
+        if (!senderId || holder !== senderId) {
+            throw new HttpException('Task is locked by another user', HttpStatus.LOCKED);
+        }
+    }
 
     async search(query: string, boardId?: string): Promise<Task[]> {
         const baseQuery = this.taskRepository.createQueryBuilder('task')
@@ -61,6 +94,13 @@ export class TasksService {
 
     async update(id: string, updateTaskDto: UpdateTaskDto): Promise<Task> {
         const { senderId, order: newOrder, column_id: newColumnId, ...meta } = updateTaskDto;
+
+        if (this.touchesContentFields(updateTaskDto)) {
+            if (!senderId) {
+                throw new HttpException('senderId is required for content updates', HttpStatus.BAD_REQUEST);
+            }
+            await this.assertContentEditLock(id, senderId);
+        }
 
         return await this.dataSource.transaction(async manager => {
             const task = await manager.findOne(Task, { where: { id } });
@@ -125,6 +165,7 @@ export class TasksService {
 
     async remove(id: string, senderId?: string): Promise<void> {
         const task = await this.findOne(id);
+        await this.assertDeleteAllowed(task.id, senderId);
         const boardId = await this.getBoardIdByColumn(task.column_id);
         await this.taskRepository.remove(task);
         if (boardId) this.boardGateway.notifyBoardUpdate(boardId, 'board_updated', { type: 'task_deleted', senderId });
